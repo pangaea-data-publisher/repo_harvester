@@ -1,0 +1,60 @@
+openapi: 3.0.4
+info:
+  title: RepoInfoHarvester
+  description: A service to collect transparent information and service offers from
+    repositories
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.0.1
+servers:
+- url: /
+paths:
+  /:
+    get:
+      tags:
+      - get repo info
+      description: Return the repo info as a dictionary
+      operationId: get_repo_info
+      parameters:
+      - name: url
+        in: query
+        description: A repository URL
+        required: true
+        style: form
+        explode: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryInfo"
+      x-openapi-router-controller: device_tagger_server.controllers.get_repo_info_controller
+components:
+  schemas:
+    RepositoryInfo:
+      type: object
+      properties:
+        repoURI:
+          type: string
+        re3dataID:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        services:
+          type: object
+          additionalProperties: true
+        policies:
+          type: object
+          additionalProperties: true
+      example:
+        metadata: ""
+        repoURI: repoURI
+        policies: ""
+        re3dataID: re3dataID
+        services: ""
+
