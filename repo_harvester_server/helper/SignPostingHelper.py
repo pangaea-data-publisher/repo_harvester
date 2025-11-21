@@ -31,8 +31,11 @@ class SignPostingHelper:
                 if api_link.get('title'):
                     services[api_link.get('anchor')]['title'] = api_link.get('title')
             if api_link.get('rel') == 'service-meta':
+                services[api_link.get('anchor')]['service_desc'] = api_link.get('link')
                 if api_link.get('type'):
                     services[api_link.get('anchor')]['output_format'] = api_link.get('type')
+            #if api_link.get('rel') == 'service-desc':
+
         if services:
             metadata['services'] = list(services.values())
         return metadata
