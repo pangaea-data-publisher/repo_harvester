@@ -1,4 +1,4 @@
-from repo_harvester_server.helper.RepositoryHarvester import CatalogMetadataHarvester
+from repo_harvester_server.harvesters import CatalogMetadataHarvester
 
 
 #repouri = 'https://doi.pangaea.de/10.1594/PANGAEA.986961'

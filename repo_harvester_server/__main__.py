@@ -2,7 +2,7 @@
 
 import connexion
 from flask import current_app
-from repo_harvester_server.helper.RepositoryHarvester import CatalogMetadataHarvester
+from repo_harvester_server.harvesters import CatalogMetadataHarvester
 #from repo_harvester_server import encoder
 
 def create_app():
