@@ -1,23 +1,36 @@
 import json
+import os
 import requests
 from .self_hosted import SignPostingHelper, MetadataHelper
 from .re3data import Re3DataHarvester
 from .fairsharing import FAIRsharingHarvester
 
 class CatalogMetadataHarvester:
-    def __init__(self, catalog_url):
+    def __init__(self, catalog_url, output_dir=None):
         self.catalog_url = catalog_url
+        self.output_dir = output_dir
         self.catalog_html = None
         self.signposting_links = []
         self.metadata = {}
 
+        if self.output_dir:
+            os.makedirs(self.output_dir, exist_ok=True)
+
+    def _write_output(self, filename, data):
+        """Helper function to write data to a JSON file in the output directory."""
+        if self.output_dir and data:
+            filepath = os.path.join(self.output_dir, filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+
     def merge_metadata(self, new_metadata):
         """
         Merges a new metadata dictionary into the main one.
-        It does not overwrite existing keys.
+        It does not overwrite existing keys, unless the existing value is empty.
         """
         for key, value in new_metadata.items():
-            if key not in self.metadata:
+            # If key doesn't exist, or if the existing value is empty (e.g., [], ''), add the new value.
+            if key not in self.metadata or not self.metadata[key]:
                 self.metadata[key] = value
 
     def harvest(self):
@@ -26,24 +39,25 @@ class CatalogMetadataHarvester:
         """
         self.harvest_self_hosted_metadata()
         self.harvest_registry_metadata()
+        
         print('FINAL MERGED METADATA: ', json.dumps(self.metadata, indent=4))
+        self._write_output('final_merged_metadata.json', self.metadata)
 
     def harvest_registry_metadata(self):
         """
         Initializes and runs all registry harvesters.
         """
-        # List of registry harvester classes to run
         registry_harvesters = [Re3DataHarvester, FAIRsharingHarvester]
 
         for harvester_class in registry_harvesters:
             harvester = harvester_class(self.catalog_url)
             harvester.harvest()
             if harvester.metadata:
-                # Wrap the metadata in a key named after the harvester's class
                 registry_key = harvester_class.__name__.replace("Harvester", "").lower()
                 wrapped_metadata = {registry_key: harvester.metadata}
                 
                 print(f"{registry_key.upper()} METADATA: ", json.dumps(wrapped_metadata, indent=4))
+                self._write_output(f'{registry_key}_metadata.json', wrapped_metadata)
                 self.merge_metadata(wrapped_metadata)
 
     def harvest_self_hosted_metadata(self):
@@ -66,22 +80,24 @@ class CatalogMetadataHarvester:
         signposting_helper = SignPostingHelper(self.catalog_url, self.catalog_html, self.catalog_header)
         metadata_helper = MetadataHelper()
         
-        # 1. Harvest from standard HTML meta tags (as a fallback)
         html_meta_metadata = metadata_helper.get_html_meta_tags_metadata(self.catalog_html)
+        self._write_output('html_meta_metadata.json', html_meta_metadata)
         self.merge_metadata(html_meta_metadata)
         print('HTML META TAG METADATA: ', html_meta_metadata)
 
-        # 2. Harvest embedded JSON-LD
         embedded_jsonld_metadata = metadata_helper.get_embedded_jsonld_metadata(self.catalog_html)
+        self._write_output('embedded_jsonld_metadata.json', embedded_jsonld_metadata)
         self.merge_metadata(embedded_jsonld_metadata)
         print('EMBEDDED JSONLD METADATA: ', embedded_jsonld_metadata)
 
-        # 3. Harvest linked JSON-LD
-        for jsonld_link in signposting_helper.get_links('describedby', 'application/ld+json'):
-            linked_jsonld_metadata = metadata_helper.get_linked_jsonld_metadata(jsonld_link.get('link'))
-            self.merge_metadata(linked_jsonld_metadata)
-            print('LINKED JSONLD METADATA: ', linked_jsonld_metadata)
+        linked_jsonld_metadata = {}
+        for i, jsonld_link in enumerate(signposting_helper.get_links('describedby', 'application/ld+json')):
+            data = metadata_helper.get_linked_jsonld_metadata(jsonld_link.get('link'))
+            linked_jsonld_metadata.update(data)
+            self._write_output(f'linked_jsonld_metadata_{i}.json', data)
+        self.merge_metadata(linked_jsonld_metadata)
+        print('LINKED JSONLD METADATA: ', linked_jsonld_metadata)
 
-        # 4. Harvest from FAIRiCat endpoint
         fairicat_metadata = signposting_helper.get_fairicat_metadata()
+        self._write_output('fairicat_metadata.json', fairicat_metadata)
         self.merge_metadata(fairicat_metadata)

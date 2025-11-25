@@ -56,7 +56,7 @@ class SignPostingHelper:
     def set_links(self):
         self.set_html_links()
         self.set_header_links()
-        unique_links = list({d["link"]: d for d in self.links}.values())
+        unique_links = list({(d["link"], d["rel"]): d for d in self.links}.values())
         self.links = unique_links
         print('LINKS: ', self.links)
 
@@ -106,8 +106,7 @@ class SignPostingHelper:
 
 class MetadataHelper:
     def __init__(self):
-        harvester_dir = os.path.dirname(os.path.abspath(__file__))
-        self.xslt_path = os.path.normpath(os.path.join(harvester_dir, '..', 'xslt', 'rdf2json.xslt'))
+        pass
 
     def get_html_meta_tags_metadata(self, html_content):
         metadata = {}
@@ -134,20 +133,37 @@ class MetadataHelper:
             print('Expecting JSON-LD string not: ', type(jstr))
             return metadata
         try:
-            cg = rdflib.ConjunctiveGraph()
-            jg = cg.parse(data=jstr, format='json-ld')
-            
-            rdf_xml = jg.serialize(format='pretty-xml')
-            rdf_doc = etree.fromstring(rdf_xml.encode('utf-8'))
-            xslt_doc = etree.parse(self.xslt_path)
-            transform = etree.XSLT(xslt_doc)
-            json_result_str = str(transform(rdf_doc))
-            metadata = json.loads(json_result_str)
-            print('JSON DATA from XSLT: ', metadata)
+            g = rdflib.Graph()
+            g.parse(data=jstr, format='json-ld')
 
+            # Fix http://schema.org to https://schema.org
+            for s, p, o in list(g):
+                new_s = rdflib.URIRef(str(s).replace('http://schema.org', 'https://schema.org')) if 'http://schema.org' in str(s) else s
+                new_p = rdflib.URIRef(str(p).replace('http://schema.org', 'https://schema.org')) if 'http://schema.org' in str(p) else p
+                new_o = rdflib.URIRef(str(o).replace('http://schema.org', 'https://schema.org')) if 'http://schema.org' in str(o) else o
+                if new_s != s or new_p != p or new_o != o:
+                    g.remove((s, p, o))
+                    g.add((new_s, new_p, new_o))
+
+            for s in g.subjects(RDF.type, SDO.DataCatalog):
+                metadata['name'] = str(g.value(s, SDO.name, default=""))
+                metadata['description'] = str(g.value(s, SDO.description, default=""))
+                metadata['disambiguatingDescription'] = str(g.value(s, SDO.disambiguatingDescription, default=""))
+                metadata['url'] = str(g.value(s, SDO.url, default=""))
+                metadata['identifier'] = str(g.value(s, SDO.identifier, default=""))
+                metadata['logo'] = str(g.value(s, SDO.logo, default=""))
+                metadata['inLanguage'] = str(g.value(s, SDO.inLanguage, default=""))
+                
+                for search_action in g.objects(s, SDO.potentialAction):
+                    if (search_action, RDF.type, SDO.SearchAction) in g:
+                        target = g.value(search_action, SDO.target, default="")
+                        metadata['search_action'] = {'target': str(target)}
+                        break 
+                break 
+        
         except Exception as e:
             print(f"Error processing JSON-LD: {e}")
-        return metadata
+        return {k: v for k, v in metadata.items() if v}
 
     def get_linked_jsonld_metadata(self, typed_link):
         metadata = {}

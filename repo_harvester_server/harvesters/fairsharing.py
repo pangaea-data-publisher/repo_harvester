@@ -60,14 +60,17 @@ class FAIRsharingParser(Parser):
 
     def parse(self):
         """
-        Parses the FAIRsharing JSON search results and populates the metadata dictionary.
+        Parses the FAIRsharing JSON search results and populates the metadata dictionary
+        with a comprehensive set of fields.
         """
         matching_results = []
         normalized_repo_hostname = self.repository_hostname.lower().replace('www.', '', 1)
         
         for result in self.raw_data:
             attributes = result.get('attributes', {})
-            homepage = attributes.get('homepage')
+            metadata = attributes.get('metadata', {})
+            homepage = metadata.get('homepage')
+            
             if not homepage: continue
 
             try:
@@ -83,16 +86,14 @@ class FAIRsharingParser(Parser):
             return
 
         active_result = None
-        # First pass: look for a 'Ready' record
         for result in matching_results:
-            if result.get('attributes', {}).get('status') == 'ready':
+            if result.get('attributes', {}).get('metadata', {}).get('status') == 'ready':
                 active_result = result
                 break
         
-        # Second pass (if no 'Ready' one was found): look for the first non-deprecated one
         if not active_result:
             for result in matching_results:
-                if result.get('attributes', {}).get('status') != 'deprecated':
+                if result.get('attributes', {}).get('metadata', {}).get('status') != 'deprecated':
                     active_result = result
                     break
         
@@ -100,14 +101,19 @@ class FAIRsharingParser(Parser):
             print(f"Found {len(matching_results)} match(es) on FAIRsharing for {self.repository_hostname}, but none were active or ready.")
             return
 
+        # --- Comprehensive Parsing Logic ---
         attributes = active_result.get('attributes', {})
-        self.metadata = {
-            'name': attributes.get('name'),
-            'homepage': attributes.get('homepage'),
-            'description': attributes.get('description'),
-            'keywords': attributes.get('keywords'),
-            'fairsharing_id': active_result.get('id')
-        }
+        metadata_nested = attributes.pop('metadata', {}) # Use .pop to get metadata and remove it from attributes
+        
+        # Merge attributes and the nested metadata, with metadata taking precedence
+        final_metadata = {**attributes, **metadata_nested}
+        
+        # Add the top-level record ID and type
+        final_metadata['fairsharing_id'] = active_result.get('id')
+        final_metadata['record_type'] = active_result.get('type')
+
+        self.metadata = final_metadata
+
 
 class FAIRsharingHarvester(Harvester):
     """
