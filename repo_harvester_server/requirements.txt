@@ -1,3 +1,4 @@
-rdflib==7.4.0
+rdflib==7.0.0
 connexion[uvicorn,flask,swagger-ui]
-lxml==6.0.2
+lxml==5.2.2
+requests==2.32.3

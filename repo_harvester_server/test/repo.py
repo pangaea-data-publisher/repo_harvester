@@ -2,8 +2,10 @@ import os
 from repo_harvester_server.harvesters import CatalogMetadataHarvester
 
 # Define the repository to be harvested
-repouri = 'https://www.pangaea.de/'
-#repouri = 'https://www.dummyrepository.org/'
+#repouri = 'https://www.pangaea.de/'
+#repouri = 'https://doi.pangaea.de/10.1594/PANGAEA.986961'
+repouri = 'https://www.dummyrepository.org/'
+#repouri = 'https://flybase.org/'
 
 
 

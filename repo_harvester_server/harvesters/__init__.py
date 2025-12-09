@@ -4,6 +4,7 @@ import requests
 from .self_hosted import SignPostingHelper, MetadataHelper
 from .re3data import Re3DataHarvester
 from .fairsharing import FAIRsharingHarvester
+from .Mapper import Mapper
 
 class CatalogMetadataHarvester:
     def __init__(self, catalog_url, output_dir=None):
@@ -29,19 +30,27 @@ class CatalogMetadataHarvester:
         It does not overwrite existing keys, unless the existing value is empty.
         """
         for key, value in new_metadata.items():
-            # If key doesn't exist, or if the existing value is empty (e.g., [], ''), add the new value.
             if key not in self.metadata or not self.metadata[key]:
                 self.metadata[key] = value
 
     def harvest(self):
         """
-        Orchestrates the entire harvesting process.
+        Orchestrates the entire harvesting process, including the final mapping.
         """
+        # 1. Harvest all raw metadata
         self.harvest_self_hosted_metadata()
         self.harvest_registry_metadata()
         
-        print('FINAL MERGED METADATA: ', json.dumps(self.metadata, indent=4))
-        self._write_output('final_merged_metadata.json', self.metadata)
+        print('FINAL HARVESTED METADATA: ', json.dumps(self.metadata, indent=4))
+        self._write_output('final_harvested_metadata.json', self.metadata)
+
+        # 2. Map the harvested data to the final RepositoryInfo structure
+        mapper = Mapper(self.metadata)
+        repository_info = mapper.map()
+
+        print('FINAL MAPPED REPOSITORY INFO: ', json.dumps(repository_info, indent=4))
+        self._write_output('repository_info.json', repository_info)
+
 
     def harvest_registry_metadata(self):
         """
